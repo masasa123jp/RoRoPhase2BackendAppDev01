@@ -1,0 +1,41 @@
+"""
+SQLAlchemy Declarative Base 定義＋共通メタデータ
+---------------------------------------------
+* 命名規約 (naming_convention) を指定しておくことで
+  Alembic 自動生成時の差分が安定し、長期運用での
+  マイグレーション衝突を防げる。
+* metadata_obj は User/Role など複数モデルで共有し、
+  中間テーブル（user_role_link など）もここに登録する。
+"""
+
+from sqlalchemy.orm import DeclarativeBase, declared_attr
+from sqlalchemy import MetaData
+
+# --- ① すべての制約・インデックスに一貫した名前を付与 -------------
+NAMING_CONVENTION: dict[str, str] = {
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "pk": "pk_%(table_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+}
+
+metadata_obj = MetaData(naming_convention=NAMING_CONVENTION)
+
+
+class Base(DeclarativeBase):
+    """全モデルが継承する基底クラス"""
+
+    metadata = metadata_obj
+
+    # __tablename__ を自動生成 (CamelCase → snake_case)
+    @declared_attr.directive
+    def __tablename__(cls) -> str:  # type: ignore
+        name = cls.__name__
+        # シンプルに lower, ただし連続大文字 (UUID 等) は分割しない
+        snake = []
+        for i, c in enumerate(name):
+            if c.isupper() and i != 0 and not name[i - 1].isupper():
+                snake.append("_")
+            snake.append(c.lower())
+        return "".join(snake)
